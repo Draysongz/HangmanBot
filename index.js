@@ -4,7 +4,7 @@ const token = '6106706434:AAFW_RoIgDywRQY4WyZYSAx1mN4ABjdFCcw';
 const bot = new TelegramBot(token, { polling: true });
 const apiUrl = 'https://api.api-ninjas.com/v1/randomword';
 
-
+let gameInProgress = false;
 const games = {};
 function hangman(msg) {
     // Retrieve a random word from the API
@@ -55,6 +55,7 @@ function hangman(msg) {
             if (!result.includes('_')) {
               bot.sendMessage(chatId, `Congratulations! You guessed the word "${word}"`);
               bot.removeAllListeners('message');
+              gameInProgress = false;
               return;
             }
   
@@ -68,6 +69,7 @@ function hangman(msg) {
             if (lives === 0) {
               bot.sendMessage(chatId, `Sorry, you ran out of lives. The word was "${word}".`);
               bot.removeAllListeners('message');
+              gameInProgress = false;
               return;
             }
   
@@ -79,9 +81,23 @@ function hangman(msg) {
       .catch((error) => {
         console.error(error);
         bot.sendMessage(msg.chat.id, 'Sorry, something went wrong. Please try again later.');
+        gameInProgress= false
       });
   }
-  bot.onText(/\/hangman/, (msg) => {
-    hangman(msg);
+ 
+
+  bot.onText(/\/single/, (msg) => {
+    if (gameInProgress) {
+      bot.sendMessage(msg.chat.id, 'Sorry, a game is already in progress.');
+    } else {
+      gameInProgress = true;
+      // start the game
+      hangman(msg);
+    }
+   
+  });  
+  bot.onText(/\/start/, (msg) => {
+    const username = msg.from.username;
+    bot.sendMessage(msg.chat.id, `Hello ${username}, Welcome to the hangman bot.`);
   });  
 
