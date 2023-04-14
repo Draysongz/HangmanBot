@@ -90,119 +90,68 @@ let gameStarting = false;
 let gameTimer;
 let players = [];
 
-function startGame() {
-  gameInProgress = true;
-  gameStarting = false;
-
-  let word = randomWords();
-  let guessedLetters = new Set();
-  let lives = new Map();
+function startRound(currentPlayer, word, guessedLetters, players) {
   let result = '_'.repeat(word.length);
   let gameOver = false;
-  let currentPlayerIndex = 0;
 
-  for (let player of players) {
-    lives.set(player.chatId, 6);
-    bot.sendMessage(player.chatId, `Starting new game! Your word has ${word.length} letters: ${result}`);
-  }
-  const intervalTime = 15000;
+  bot.sendMessage(currentPlayer.chatId, `@${currentPlayer.username}, you have ${currentPlayer.lives} lives left. Guess a letter!`);
 
-  let interval = setInterval(() => {
-    console.log('Players:', players);
-    let currentPlayer = players[currentPlayerIndex];
-    let playerLives = lives.get(currentPlayer.chatId);
-  
-    console.log('Current player:', currentPlayer) 
-    bot.sendMessage(currentPlayer.chatId, `@${currentPlayer.username}, you have ${playerLives} lives left. Guess a letter!`);
-  
-    const messageHandler = (msg) => {
-      if (msg.from.username !== currentPlayer.username) {
-        return;
-      }
-  
-      const letter = msg.text.toLowerCase();
-  
-      if (guessedLetters.has(letter)) {
-        bot.sendMessage(currentPlayer.chatId, `@${currentPlayer.username}, you already guessed the letter "${letter}"`);
-      } else {
-        guessedLetters.add(letter);
-  
-        if (word.includes(letter)) {
-          result = result.split('').map((char, index) => {
-            if (word[index] === letter) {
-              return letter;
-            } else {
-              return char;
-            }
-          }).join('');
-          bot.sendMessage(currentPlayer.chatId, `@${currentPlayer.username}, good guess! The word now looks like this: ${result}`);
-        } else {
-          playerLives--;
-          lives.set(currentPlayer.chatId, playerLives);
-          if (playerLives === 0) {
-            bot.sendMessage(currentPlayer.chatId, `@${currentPlayer.username}, sorry, you ran out of lives. The word was "${word}".`);
-            players.splice(currentPlayerIndex, 1);
-            currentPlayerIndex--;
+  const messageHandler = (msg) => {
+    if (msg.from.username !== currentPlayer.username) {
+      return;
+    }
+
+    const letter = msg.text.toLowerCase();
+
+    if (guessedLetters.has(letter)) {
+      bot.sendMessage(currentPlayer.chatId, `@${currentPlayer.username}, you already guessed the letter "${letter}"`);
+    } else {
+      guessedLetters.add(letter);
+
+      if (word.includes(letter)) {
+        result = result.split('').map((char, index) => {
+          if (word[index] === letter) {
+            return letter;
           } else {
-            bot.sendMessage(currentPlayer.chatId, `@${currentPlayer.username}, bad luck! The letter "${letter}" is not in the word. You have ${playerLives} lives left.`);
+            return char;
           }
-        }
-  
-        if (!result.includes('_')) {
-          for (let player of players) {
-            bot.sendMessage(player.chatId, `Congratulations! You guessed the word "${word}"`);
-          }
-          clearInterval(interval);
-        } else if (players.length === 1) {
-          for (let player of players) {
-            bot.sendMessage(player.chatId, `Game over! The word was "${word}".`);
-          }
-          clearInterval(interval);
-        }
-  
-        if (!gameOver) {
-          currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
-          console.log(currentPlayerIndex)
-          currentPlayer = players[currentPlayerIndex];
-          bot.sendMessage(currentPlayer.chatId, `@${currentPlayer.username}, you have ${lives.get(currentPlayer.chatId)} lives left. Guess a letter!`);
+        }).join('');
+        bot.sendMessage(currentPlayer.chatId, `@${currentPlayer.username}, good guess! The word now looks like this: ${result}`);
+      } else {
+        currentPlayer.lives--;
+        if (currentPlayer.lives === 0) {
+          bot.sendMessage(currentPlayer.chatId, `@${currentPlayer.username}, sorry, you ran out of lives. The word was "${word}".`);
+          players.splice(players.indexOf(currentPlayer), 1);
+        } else {
+          bot.sendMessage(currentPlayer.chatId, `@${currentPlayer.username}, bad luck! The letter "${letter}" is not in the word. You have ${currentPlayer.lives} lives left.`);
         }
       }
-    };
-  
-    bot.on('message', messageHandler);
-  
-    setTimeout(() => {
-      bot.removeListener('message', messageHandler);
+
+      if (!result.includes('_')) {
+        for (let player of players) {
+          bot.sendMessage(player.chatId, `Congratulations! You guessed the word "${word}"`);
+        }
+        gameOver = true;
+      } else if (players.length === 1) {
+        for (let player of players) {
+          bot.sendMessage(player.chatId, `Game over! The word was "${word}".`);
+        }
+        gameOver = true;
+      }
+
       if (!gameOver) {
-        currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
-        currentPlayer = players[currentPlayerIndex];
-        bot.sendMessage(currentPlayer.chatId, `@${currentPlayer.username}, you have ${lives.get(currentPlayer.chatId)} lives left. Guess a letter!`);
+        let nextPlayerIndex = (players.indexOf(currentPlayer) + 1) % players.length;
+        let nextPlayer = players[nextPlayerIndex];
+        bot.sendMessage(nextPlayer.chatId, `@${nextPlayer.username}, you have ${nextPlayer.lives} lives left. Guess a letter!`);
+        setTimeout(() => {
+          startRound(nextPlayer, word, guessedLetters, players);
+        }, 15000);
       }
-    }, intervalTime);
-  
-  }, intervalTime);
-  
-}
+    }
+  };
 
-bot.onText(/\/multi/, (msg) => {
-if (gameInProgress || gameStarting) {
-bot.sendMessage(msg.chat.id, 'A game is already in progress or starting. Please wait.');
-} else {
-players = [{ chatId: msg.chat.id, username: msg.from.username }];
-bot.sendMessage(msg.chat.id, 'Starting new game! Send /join to join the game.');
-gameStarting = true;
-gameTimer = setTimeout(() => {
-if (players.length < 2) {
-bot.sendMessage(msg.chat.id, 'Not enough players joined the game. Game cancelled.');
-gameStarting = false;
-} else {
-  console.log('Game is starting')
-startGame();
-
+  bot.on('message', messageHandler);
 }
-}, 30000);
-}
-});
 
 bot.onText(/\/join/, (msg) => {
 if (!gameStarting ) {
