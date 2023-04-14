@@ -79,6 +79,7 @@
 // });
 
 const TelegramBot = require('node-telegram-bot-api');
+console.log('Bot is starting') 
 const randomWords = require('random-words');
 
 const token = '6106706434:AAFW_RoIgDywRQY4WyZYSAx1mN4ABjdFCcw';
@@ -104,25 +105,28 @@ function startGame() {
     lives.set(player.chatId, 6);
     bot.sendMessage(player.chatId, `Starting new game! Your word has ${word.length} letters: ${result}`);
   }
+  const intervalTime = 15000;
 
-  while (!gameOver) {
+  let interval = setInterval(() => {
+    console.log('Players:', players);
     let currentPlayer = players[currentPlayerIndex];
     let playerLives = lives.get(currentPlayer.chatId);
-
+  
+    console.log('Current player:', currentPlayer) 
     bot.sendMessage(currentPlayer.chatId, `@${currentPlayer.username}, you have ${playerLives} lives left. Guess a letter!`);
-
+  
     const messageHandler = (msg) => {
       if (msg.from.username !== currentPlayer.username) {
         return;
       }
-
+  
       const letter = msg.text.toLowerCase();
-
+  
       if (guessedLetters.has(letter)) {
         bot.sendMessage(currentPlayer.chatId, `@${currentPlayer.username}, you already guessed the letter "${letter}"`);
       } else {
         guessedLetters.add(letter);
-
+  
         if (word.includes(letter)) {
           result = result.split('').map((char, index) => {
             if (word[index] === letter) {
@@ -143,29 +147,30 @@ function startGame() {
             bot.sendMessage(currentPlayer.chatId, `@${currentPlayer.username}, bad luck! The letter "${letter}" is not in the word. You have ${playerLives} lives left.`);
           }
         }
-
+  
         if (!result.includes('_')) {
           for (let player of players) {
             bot.sendMessage(player.chatId, `Congratulations! You guessed the word "${word}"`);
           }
-          gameOver = true;
+          clearInterval(interval);
         } else if (players.length === 1) {
           for (let player of players) {
             bot.sendMessage(player.chatId, `Game over! The word was "${word}".`);
           }
-          gameOver = true;
+          clearInterval(interval);
         }
-
+  
         if (!gameOver) {
           currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+          console.log(currentPlayerIndex)
           currentPlayer = players[currentPlayerIndex];
           bot.sendMessage(currentPlayer.chatId, `@${currentPlayer.username}, you have ${lives.get(currentPlayer.chatId)} lives left. Guess a letter!`);
         }
       }
     };
-
+  
     bot.on('message', messageHandler);
-
+  
     setTimeout(() => {
       bot.removeListener('message', messageHandler);
       if (!gameOver) {
@@ -173,10 +178,11 @@ function startGame() {
         currentPlayer = players[currentPlayerIndex];
         bot.sendMessage(currentPlayer.chatId, `@${currentPlayer.username}, you have ${lives.get(currentPlayer.chatId)} lives left. Guess a letter!`);
       }
-    }, 6000)};
-
+    }, intervalTime);
+  
+  }, intervalTime);
+  
 }
-
 
 bot.onText(/\/multi/, (msg) => {
 if (gameInProgress || gameStarting) {
@@ -190,7 +196,9 @@ if (players.length < 2) {
 bot.sendMessage(msg.chat.id, 'Not enough players joined the game. Game cancelled.');
 gameStarting = false;
 } else {
+  console.log('Game is starting')
 startGame();
+
 }
 }, 30000);
 }
@@ -204,6 +212,7 @@ bot.sendMessage(msg.chat.id, 'A game is already in progress. Please wait for the
 } else {
 players.push({ chatId: msg.chat.id, username: msg.from.username });
 bot.sendMessage(msg.chat.id,` @${msg.from.username} has joined the game!`);
+
 }
 });
 
